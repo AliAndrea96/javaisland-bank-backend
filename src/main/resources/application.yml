@@ -13,12 +13,21 @@ spring:
   jpa:
     database-platform: org.hibernate.dialect.PostgreSQLDialect
     hibernate:
-      ddl-auto: update
+      # 🔄 Svuota e ricrea le tabelle per evitare l'errore dei dati nulli vecchi
+      ddl-auto: create-drop
     show-sql: true
     properties:
       hibernate:
         format_sql: true
 
-# 🔌 CONFIGURAZIONE DELLA PORTA DEL SERVER TOMCAT
+  # 🔐 CONFIGURAZIONE SICUREZZA OAUTH2 / KEYCLOAK
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          # Inseriamo l'URL del tuo Keycloak locale (modifica la porta o il realm se differiscono)
+          issuer-uri: http://localhost:8080/realms/javaisland-realm
+
+# 🔌 CONFIGURAZIONE DELLA PORTA DEL BACKEND TOMCAT
 server:
-  port: 8080
+  port: 8081
