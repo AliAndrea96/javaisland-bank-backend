@@ -1,81 +1,142 @@
 package com.javaisland.bank_backend.request;
 
+import com.javaisland.bank_backend.card.Card;
+import com.javaisland.bank_backend.card.CardRepository;
 import com.javaisland.bank_backend.exception.ApiBankException;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 
 @Service
 public class RequestService {
 
-    // 📌 1. Costante per evitare la duplicazione della stringa "PENDING"
-    private static final String STATUS_PENDING = "PENDING";
-
-    private final BankRequestRepository requestRepository;
+    private final BankRequestRepository bankRequestRepository;
     private final LoanRepository loanRepository;
+    private final CardRepository cardRepository;
 
-    public RequestService(BankRequestRepository requestRepository, LoanRepository loanRepository) {
-        this.requestRepository = requestRepository;
+    public RequestService(BankRequestRepository bankRequestRepository,
+                          LoanRepository loanRepository,
+                          CardRepository cardRepository) {
+        this.bankRequestRepository = bankRequestRepository;
         this.loanRepository = loanRepository;
+        this.cardRepository = cardRepository;
     }
 
-    // 🧠 1. CREA UNA RICHIESTA BUROCRATICA GENERICA
+    @Transactional
     public BankRequest createRequest(Long userId, String description) {
         BankRequest request = new BankRequest();
         request.setUserId(userId);
         request.setDescription(description);
-        request.setStatus(STATUS_PENDING); // Usa la costante
-        return requestRepository.save(request);
+        request.setStatus("PENDING");
+        return bankRequestRepository.save(request);
     }
 
-    // 🧠 2. APPROVAZIONE O RIFIUTO DELLA RICHIESTA DA PARTE DI UN DIPENDENTE
-    public BankRequest reviewRequest(Long requestId, Long employeeId, String status, String rejectionReason) {
-        BankRequest request = requestRepository.findById(requestId)
-                .orElseThrow(() -> new ApiBankException("Richiesta burocratica non trovata."));
-
-        if (!STATUS_PENDING.equals(request.getStatus())) { // Usa la costante
-            throw new ApiBankException("Questa richiesta è già stata elaborata.");
+    @Transactional
+    public BankRequest createAccountClosureRequest(Long userId, Long accountId) {
+        if (accountId == null) {
+            throw new ApiBankException("L'ID del conto corrente è obbligatorio per la chiusura.");
         }
-
-        request.setStatus(status);
-        request.setReviewedByUserId(employeeId);
-
-        if ("REJECTED".equals(status)) {
-            if (rejectionReason == null || rejectionReason.trim().isEmpty()) {
-                throw new ApiBankException("È obbligatorio inserire il motivo del rifiuto.");
-            }
-            request.setRejectionReason(rejectionReason);
-        }
-
-        return requestRepository.save(request);
+        BankRequest request = new BankRequest();
+        request.setUserId(userId);
+        request.setStatus("PENDING");
+        request.setDescription("RICHIESTA_CHIUSURA_CONTO | ID Conto: " + accountId);
+        return bankRequestRepository.save(request);
     }
 
-    // 🧠 3. CALCOLO RATA E RICHIESTA FINANZIAMENTO (LOAN)
-// 🧠 3. CALCOLO RATA E RICHIESTA FINANZIAMENTO (Aggiornato con accountId)
+    @Transactional
+    public BankRequest createCardBlockRequest(Long userId, Long cardId) {
+        if (cardId == null) {
+            throw new ApiBankException("L'ID della carta è obbligatorio per il blocco.");
+        }
+        BankRequest request = new BankRequest();
+        request.setUserId(userId);
+        request.setStatus("PENDING");
+        request.setDescription("RICHIESTA_BLOCCO_CARTA | ID Carta: " + cardId);
+        return bankRequestRepository.save(request);
+    }
+
+    @Transactional
     public Loan applyForLoan(Long userId, BigDecimal amount, BigDecimal annualRate, Integer months, Long accountId) {
         if (amount.compareTo(BigDecimal.ZERO) <= 0 || months <= 0) {
             throw new ApiBankException("Importo e durata del finanziamento devono essere maggiori di zero.");
         }
 
-        BigDecimal monthlyInstallment = calculateMonthlyInstallment(amount, annualRate, months);
+        // 🧠 Calcolo della rata allineato alla tua logica precedente
+        BigDecimal years = BigDecimal.valueOf(months).divide(BigDecimal.valueOf(12), 4, RoundingMode.HALF_UP);
+        BigDecimal totalInterest = amount.multiply(annualRate.divide(BigDecimal.valueOf(100), 4, RoundingMode.HALF_UP)).multiply(years);
+        BigDecimal totalToRepay = amount.add(totalInterest);
+        BigDecimal monthlyInstallment = totalToRepay.divide(BigDecimal.valueOf(months), 2, RoundingMode.HALF_UP);
 
         Loan loan = new Loan();
         loan.setUserId(userId);
+        // 📌 Modificati i setter con i nomi reali della tua entità Loan!
         loan.setLoanAmount(amount);
         loan.setInterestRate(annualRate);
         loan.setDurationMonths(months);
         loan.setMonthlyInstallment(monthlyInstallment);
-        loan.setStatus(STATUS_PENDING);
-        loan.setAccountId(accountId); // 📌 Imposta il conto corrente inserito nel DTO
+        loan.setStatus("PENDING");
+        loan.setAccountId(accountId);
 
         return loanRepository.save(loan);
     }
 
-    // 📌 2. Metodo estratto per il calcolo matematico della rata
-    private BigDecimal calculateMonthlyInstallment(BigDecimal amount, BigDecimal annualRate, Integer months) {
-        BigDecimal years = BigDecimal.valueOf(months).divide(BigDecimal.valueOf(12), 4, RoundingMode.HALF_UP);
-        BigDecimal totalInterest = amount.multiply(annualRate.divide(BigDecimal.valueOf(100), 4, RoundingMode.HALF_UP)).multiply(years);
-        BigDecimal totalToRepay = amount.add(totalInterest);
-        return totalToRepay.divide(BigDecimal.valueOf(months), 2, RoundingMode.HALF_UP);
+    @Transactional
+    public BankRequest reviewRequest(Long requestId, Long employeeId, String status, String rejectionReason) {
+        BankRequest request = bankRequestRepository.findById(requestId)
+                .orElseThrow(() -> new ApiBankException("Richiesta non trovata"));
+
+        request.setStatus(status);
+        request.setReviewedByUserId(employeeId);
+        if ("REJECTED".equals(status)) {
+            request.setRejectionReason(rejectionReason);
+        }
+        return bankRequestRepository.save(request);
+    }
+
+    @Transactional
+    public BankRequest processBankRequest(ProcessRequestDTO dto) {
+        BankRequest request = bankRequestRepository.findById(dto.getRequestId())
+                .orElseThrow(() -> new ApiBankException("Richiesta non trovata"));
+
+        if (!"PENDING".equals(request.getStatus())) {
+            throw new ApiBankException("Questa richiesta è già stata elaborata");
+        }
+
+        request.setStatus(dto.getStatus());
+        request.setReviewedByUserId(dto.getEmployeeId());
+
+        if ("REJECTED".equals(dto.getStatus())) {
+            if (dto.getRejectionReason() == null || dto.getRejectionReason().isBlank()) {
+                throw new ApiBankException("Il motivo del rifiuto è obbligatorio per lo stato REJECTED");
+            }
+            request.setRejectionReason(dto.getRejectionReason());
+            return bankRequestRepository.save(request);
+        }
+
+        if ("COMPLETED".equals(dto.getStatus())) {
+            executeApprovedAction(request);
+        }
+
+        return bankRequestRepository.save(request);
+    }
+
+    private void executeApprovedAction(BankRequest request) {
+        String desc = request.getDescription();
+
+        if (desc != null && desc.startsWith("RICHIESTA_BLOCCO_CARTA")) {
+            String[] parts = desc.split(": ");
+            if (parts.length < 2) {
+                throw new ApiBankException("Formato descrizione richiesta non valido");
+            }
+            Long cardId = Long.parseLong(parts[1].trim());
+
+            Card card = cardRepository.findById(cardId)
+                    .orElseThrow(() -> new ApiBankException("Carta non trovata per il blocco automatico"));
+
+            card.setStatus(com.javaisland.bank_backend.card.CardStatus.BLOCKED);
+            cardRepository.save(card);
+        }
     }
 }

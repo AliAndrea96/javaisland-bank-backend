@@ -43,4 +43,6 @@ public class BankRequest {
             this.createdAt = LocalDateTime.now(ZoneId.of("Europe/Rome"));
         }
     }
+
+
 }
