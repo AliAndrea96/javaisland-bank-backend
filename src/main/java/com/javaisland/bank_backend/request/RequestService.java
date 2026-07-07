@@ -8,6 +8,9 @@ import java.math.RoundingMode;
 @Service
 public class RequestService {
 
+    // 📌 1. Costante per evitare la duplicazione della stringa "PENDING"
+    private static final String STATUS_PENDING = "PENDING";
+
     private final BankRequestRepository requestRepository;
     private final LoanRepository loanRepository;
 
@@ -21,7 +24,7 @@ public class RequestService {
         BankRequest request = new BankRequest();
         request.setUserId(userId);
         request.setDescription(description);
-        request.setStatus("PENDING");
+        request.setStatus(STATUS_PENDING); // Usa la costante
         return requestRepository.save(request);
     }
 
@@ -30,7 +33,7 @@ public class RequestService {
         BankRequest request = requestRepository.findById(requestId)
                 .orElseThrow(() -> new ApiBankException("Richiesta burocratica non trovata."));
 
-        if (!"PENDING".equals(request.getStatus())) {
+        if (!STATUS_PENDING.equals(request.getStatus())) { // Usa la costante
             throw new ApiBankException("Questa richiesta è già stata elaborata.");
         }
 
@@ -48,17 +51,13 @@ public class RequestService {
     }
 
     // 🧠 3. CALCOLO RATA E RICHIESTA FINANZIAMENTO (LOAN)
-    public Loan applyForLoan(Long userId, BigDecimal amount, BigDecimal annualRate, Integer months) {
+// 🧠 3. CALCOLO RATA E RICHIESTA FINANZIAMENTO (Aggiornato con accountId)
+    public Loan applyForLoan(Long userId, BigDecimal amount, BigDecimal annualRate, Integer months, Long accountId) {
         if (amount.compareTo(BigDecimal.ZERO) <= 0 || months <= 0) {
             throw new ApiBankException("Importo e durata del finanziamento devono essere maggiori di zero.");
         }
 
-        // Calcolo della rata mensile con tasso d'interesse semplice (Quota Capitale + Quota Interessi)
-        // Formula: (Importo + (Importo * Tasso * Anni)) / Mesi
-        BigDecimal years = BigDecimal.valueOf(months).divide(BigDecimal.valueOf(12), 4, RoundingMode.HALF_UP);
-        BigDecimal totalInterest = amount.multiply(annualRate.divide(BigDecimal.valueOf(100), 4, RoundingMode.HALF_UP)).multiply(years);
-        BigDecimal totalToRepay = amount.add(totalInterest);
-        BigDecimal monthlyInstallment = totalToRepay.divide(BigDecimal.valueOf(months), 2, RoundingMode.HALF_UP);
+        BigDecimal monthlyInstallment = calculateMonthlyInstallment(amount, annualRate, months);
 
         Loan loan = new Loan();
         loan.setUserId(userId);
@@ -66,8 +65,17 @@ public class RequestService {
         loan.setInterestRate(annualRate);
         loan.setDurationMonths(months);
         loan.setMonthlyInstallment(monthlyInstallment);
-        loan.setStatus("PENDING");
+        loan.setStatus(STATUS_PENDING);
+        loan.setAccountId(accountId); // 📌 Imposta il conto corrente inserito nel DTO
 
         return loanRepository.save(loan);
+    }
+
+    // 📌 2. Metodo estratto per il calcolo matematico della rata
+    private BigDecimal calculateMonthlyInstallment(BigDecimal amount, BigDecimal annualRate, Integer months) {
+        BigDecimal years = BigDecimal.valueOf(months).divide(BigDecimal.valueOf(12), 4, RoundingMode.HALF_UP);
+        BigDecimal totalInterest = amount.multiply(annualRate.divide(BigDecimal.valueOf(100), 4, RoundingMode.HALF_UP)).multiply(years);
+        BigDecimal totalToRepay = amount.add(totalInterest);
+        return totalToRepay.divide(BigDecimal.valueOf(months), 2, RoundingMode.HALF_UP);
     }
 }

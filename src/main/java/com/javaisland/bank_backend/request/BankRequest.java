@@ -3,13 +3,12 @@ package com.javaisland.bank_backend.request;
 import jakarta.persistence.*;
 import lombok.*;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 
 @Entity
 @Table(name = "requests")
 @Getter
 @Setter
-@NoArgsConstructor
-@AllArgsConstructor
 public class BankRequest {
 
     @Id
@@ -20,17 +19,28 @@ public class BankRequest {
     private String description;
 
     @Column(name = "status", nullable = false, length = 30)
-    private String status; // 'PENDING', 'APPROVED', 'REJECTED'
+    private String status;
 
     @Column(name = "rejection_reason", length = 255)
     private String rejectionReason;
 
     @Column(name = "user_id", nullable = false)
-    private Long userId; // Utente che fa la richiesta
+    private Long userId;
 
     @Column(name = "reviewed_by_user_id")
-    private Long reviewedByUserId; // Impiegato che approva/rifiuta
+    private Long reviewedByUserId;
 
     @Column(name = "created_at")
-    private LocalDateTime createdAt = LocalDateTime.now();
+    private LocalDateTime createdAt;
+
+    // Costruttore vuoto manuale (sostituisce @NoArgsConstructor ed evita avvisi ridondanti)
+    public BankRequest() {
+    }
+
+    @PrePersist
+    protected void onCreate() {
+        if (this.createdAt == null) {
+            this.createdAt = LocalDateTime.now(ZoneId.of("Europe/Rome"));
+        }
+    }
 }

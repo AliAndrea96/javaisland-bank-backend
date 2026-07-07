@@ -3,6 +3,7 @@ package com.javaisland.bank_backend.user;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import jakarta.validation.Valid;
 
 @RestController
 @RequestMapping("/api/users")
@@ -16,8 +17,9 @@ public class UserController {
 
     // 🧠 1. ENDPOINT PER LA REGISTRAZIONE (Accessibile da tutti)
     @PostMapping("/register")
-    public ResponseEntity<User> register(@RequestBody User user) {
-        User registeredUser = userService.registerUser(user);
+    // 📌 Cambiato da @RequestBody User user a @RequestBody UserRegisterDTO registerDTO
+    public ResponseEntity<User> register(@Valid @RequestBody UserRegisterDTO registerDTO) {
+        User registeredUser = userService.registerUser(registerDTO);
         return new ResponseEntity<>(registeredUser, HttpStatus.CREATED);
     }
 

@@ -2,8 +2,9 @@ package com.javaisland.bank_backend.request;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize; // 📌 Inserito import per la sicurezza
 import org.springframework.web.bind.annotation.*;
-import java.math.BigDecimal;
+import jakarta.validation.Valid;
 
 @RestController
 @RequestMapping("/api/requests")
@@ -15,18 +16,17 @@ public class RequestController {
         this.requestService = requestService;
     }
 
-    // 🧠 1. ENDPOINT PER CREARE UNA RICHIESTA GENERICA
+    // 🧠 1. ENDPOINT PER CREARE UNA RICHIESTA GENERICA (Solo Clienti)
     @PostMapping
-    public ResponseEntity<BankRequest> createRequest(
-            @RequestParam Long userId,
-            @RequestParam String description) {
-
-        BankRequest newRequest = requestService.createRequest(userId, description);
+    @PreAuthorize("hasRole('CUSTOMER')") // 📌 Autorizza solo utenti con ruolo CUSTOMER
+    public ResponseEntity<BankRequest> createRequest(@Valid @RequestBody GenericRequestDTO dto) {
+        BankRequest newRequest = requestService.createRequest(dto.getUserId(), dto.getDescription());
         return new ResponseEntity<>(newRequest, HttpStatus.CREATED);
     }
 
-    // 🧠 2. ENDPOINT PER APPROVARE/RIFIUTARE UNA RICHIESTA (Funzione per Dipendente)
+    // 🧠 2. ENDPOINT PER APPROVARE/RIFIUTARE UNA RICHIESTA (Solo Dipendenti)
     @PatchMapping("/{requestId}/review")
+    @PreAuthorize("hasRole('EMPLOYEE')") // 📌 Autorizza solo utenti con ruolo EMPLOYEE
     public ResponseEntity<BankRequest> reviewRequest(
             @PathVariable Long requestId,
             @RequestParam Long employeeId,
@@ -37,15 +37,17 @@ public class RequestController {
         return ResponseEntity.ok(reviewedRequest);
     }
 
-    // 🧠 3. ENDPOINT PER RICHIEDERE UN PRESTITO E CALCOLARE LA RATA
+    // 🧠 3. ENDPOINT PER RICHIEDERE UN PRESTITO (Solo Clienti)
     @PostMapping("/loans")
-    public ResponseEntity<Loan> applyForLoan(
-            @RequestParam Long userId,
-            @RequestParam BigDecimal amount,
-            @RequestParam BigDecimal annualRate,
-            @RequestParam Integer months) {
-
-        Loan newLoan = requestService.applyForLoan(userId, amount, annualRate, months);
+    @PreAuthorize("hasRole('CUSTOMER')") // 📌 Autorizza solo utenti con ruolo CUSTOMER
+    public ResponseEntity<Loan> applyForLoan(@Valid @RequestBody LoanApplyDTO dto) {
+        Loan newLoan = requestService.applyForLoan(
+                dto.getUserId(),
+                dto.getAmount(),
+                dto.getAnnualRate(),
+                dto.getMonths(),
+                dto.getAccountId()
+        );
         return new ResponseEntity<>(newLoan, HttpStatus.CREATED);
     }
 }

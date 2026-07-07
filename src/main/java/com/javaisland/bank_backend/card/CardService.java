@@ -15,12 +15,17 @@ public class CardService {
         this.cardRepository = cardRepository;
     }
 
-    // 🧠 LOGICA PER GENERARE UNA NUOVA CARTA (Usa CardType Enum)
-    public Card issueNewCard(Long accountId, String holderName, CardType cardType) {
+    // 🧠 LOGICA PER GENERARE UNA NUOVA CARTA (Usa il DTO)
+    public Card issueNewCard(CardIssueDTO dto) {
+        // 📌 CONTROLLO EDGE CASE: Il nome del titolare deve contenere solo lettere e spazi
+        if (!dto.getHolderName().matches("^[a-zA-Z\\s]+$")) {
+            throw new ApiBankException("Il nome del titolare può contenere solo lettere e spazi.");
+        }
+
         Card card = new Card();
-        card.setAccountId(accountId);
-        card.setHolderName(holderName);
-        card.setCardType(cardType);
+        card.setAccountId(dto.getAccountId());
+        card.setHolderName(dto.getHolderName());
+        card.setCardType(dto.getCardType());
 
         // Impostiamo lo stato iniziale usando l'Enum
         card.setStatus(CardStatus.INACTIVE);

@@ -2,7 +2,9 @@ package com.javaisland.bank_backend.card;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize; // 📌 Inserito import per la sicurezza
 import org.springframework.web.bind.annotation.*;
+import jakarta.validation.Valid;
 
 @RestController
 @RequestMapping("/api/cards")
@@ -14,22 +16,20 @@ public class CardController {
         this.cardService = cardService;
     }
 
-    // 🧠 ENDPOINT PER EMETTERE UNA NUOVA CARTA
+    // 🧠 ENDPOINT PER EMETTERE UNA NUOVA CARTA (Solo Dipendenti)
     @PostMapping("/issue")
-    public ResponseEntity<Card> issueCard(
-            @RequestParam Long accountId,
-            @RequestParam String holderName,
-            @RequestParam CardType cardType) { // Cambiato da Integer a CardType
-
-        Card newCard = cardService.issueNewCard(accountId, holderName, cardType);
+    @PreAuthorize("hasRole('EMPLOYEE')") // 📌 Blocca l'accesso se non si è EMPLOYEE
+    public ResponseEntity<Card> issueCard(@Valid @RequestBody CardIssueDTO dto) {
+        Card newCard = cardService.issueNewCard(dto);
         return new ResponseEntity<>(newCard, HttpStatus.CREATED);
     }
 
-    // 🧠 ENDPOINT PER CAMBIARE STATO (Attivazione o Blocco)
+    // 🧠 ENDPOINT PER CAMBIARE STATO (Solo Dipendenti)
     @PatchMapping("/{cardId}/status")
+    @PreAuthorize("hasRole('EMPLOYEE')") // 📌 Blocca l'accesso se non si è EMPLOYEE
     public ResponseEntity<Card> updateStatus(
             @PathVariable Long cardId,
-            @RequestParam CardStatus status) { // Cambiato da Integer a CardStatus
+            @RequestParam CardStatus status) {
 
         Card updatedCard = cardService.updateCardStatus(cardId, status);
         return ResponseEntity.ok(updatedCard);

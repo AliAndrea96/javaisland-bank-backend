@@ -12,8 +12,8 @@ spring:
     driver-class-name: org.postgresql.Driver
 
   jpa:
-    database-platform: org.hibernate.dialect.PostgreSQLDialect
     hibernate:
+      # 📌 Cambiato temporaneamente da update a create per svuotare i vecchi dati incompatibili
       ddl-auto: update
     show-sql: true
     properties:
@@ -32,4 +32,4 @@ springdoc:
     path: /api/v3/api-docs
   swagger-ui:
     path: /api/swagger-ui.html
-  override-with-generic-response: false
+  override-with-generic: true
